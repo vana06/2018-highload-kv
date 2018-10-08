@@ -20,6 +20,12 @@ dependencies {
 
     // HTTP client for unit tests
     testCompile("org.apache.httpcomponents:fluent-hc:4.5.3")
+
+    //MapDB
+    compile("org.mapdb:mapdb:3.0.5")
+
+    //One-nio
+    compile("ru.odnoklassniki:one-nio:1.0.2")
 }
 
 tasks {
