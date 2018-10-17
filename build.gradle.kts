@@ -11,6 +11,9 @@ repositories {
 }
 
 dependencies {
+    // Our beloved one-nio
+    compile("ru.odnoklassniki:one-nio:1.0.2")
+
     // Annotations for better code documentation
     compile("com.intellij:annotations:12.0")
 
@@ -18,14 +21,8 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.3.1")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.3.1")
 
-    // HTTP client for unit tests
-    testCompile("org.apache.httpcomponents:fluent-hc:4.5.3")
-
-    //MapDB
-    compile("org.mapdb:mapdb:3.0.5")
-
-    //One-nio
-    compile("ru.odnoklassniki:one-nio:1.0.2")
+    // Guava for tests
+    testCompile("com.google.guava:guava:23.1-jre")
 }
 
 tasks {
