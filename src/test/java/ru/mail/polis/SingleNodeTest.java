@@ -114,7 +114,7 @@ class SingleNodeTest extends TestBase {
     @Test
     void badRequest() {
         assertTimeoutPreemptively(TIMEOUT, () -> assertEquals(
-                400,
+                404,
                 client.get("/abracadabra").getStatus()));
     }
 
