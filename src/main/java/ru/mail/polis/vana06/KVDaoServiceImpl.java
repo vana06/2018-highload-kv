@@ -8,6 +8,7 @@ import ru.mail.polis.KVService;
 
 import java.io.IOException;
 import java.util.NoSuchElementException;
+import java.util.Set;
 
 /**
  * Простой веб-сервер на основе one-nio
@@ -18,6 +19,8 @@ public class KVDaoServiceImpl extends HttpServer implements KVService {
 
     @NotNull
     private final KVDao dao;
+    @NotNull
+    private final Set<String> topology;
 
     /**
      * Инициализирует сервер на порту {@code port}
@@ -26,9 +29,12 @@ public class KVDaoServiceImpl extends HttpServer implements KVService {
      * @param dao хранилище данных
      * @throws IOException пробрасывает суперкласс {@code HttpServer}
      */
-    public KVDaoServiceImpl(final int port, @NotNull final KVDao dao) throws IOException {
+    public KVDaoServiceImpl(final int port,
+                            @NotNull final KVDao dao,
+                            @NotNull final Set<String> topology) throws IOException {
         super(create(port));
         this.dao = dao;
+        this.topology = topology;
     }
 
     private static HttpServerConfig create(int port) {
@@ -96,7 +102,7 @@ public class KVDaoServiceImpl extends HttpServer implements KVService {
      */
     @Override
     public void handleDefault(Request request, HttpSession session) throws IOException {
-        session.sendError(Response.NOT_FOUND, null);
+        session.sendError(Response.BAD_REQUEST, null);
     }
 
     private Response get(String id) throws IOException, NoSuchElementException{

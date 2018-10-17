@@ -23,6 +23,9 @@ dependencies {
 
     // Guava for tests
     testCompile("com.google.guava:guava:23.1-jre")
+
+    //MapDB
+    compile("org.mapdb:mapdb:3.0.5")
 }
 
 tasks {

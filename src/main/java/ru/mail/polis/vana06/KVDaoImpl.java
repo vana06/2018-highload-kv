@@ -5,6 +5,7 @@ import org.mapdb.DB;
 import org.mapdb.DBMaker;
 import org.mapdb.HTreeMap;
 import org.mapdb.Serializer;
+import org.mapdb.serializer.SerializerArrayTuple;
 import ru.mail.polis.KVDao;
 
 import java.io.File;
@@ -18,7 +19,7 @@ import java.util.NoSuchElementException;
 public class KVDaoImpl implements KVDao {
 
     private final DB db;
-    private final HTreeMap<byte[], byte[]> storage;
+    private final HTreeMap<byte[], Object[]> storage;
 
     /**
      * Инициализирует хранилище
@@ -35,7 +36,7 @@ public class KVDaoImpl implements KVDao {
                 .make();
         this.storage = db.hashMap(data.getName())
                 .keySerializer(Serializer.BYTE_ARRAY)
-                .valueSerializer(Serializer.BYTE_ARRAY)
+                .valueSerializer(new SerializerArrayTuple(Serializer.BYTE_ARRAY, Serializer.LONG))
                 .createOrOpen();
     }
 
@@ -48,12 +49,15 @@ public class KVDaoImpl implements KVDao {
      */
     @NotNull
     @Override
-    public byte[] get(@NotNull byte[] key) throws NoSuchElementException {
-        byte[] bytes = storage.get(key);
+    public byte[] get(@NotNull byte[] key) throws NoSuchElementException, IllegalStateException {
+        Object[] bytes = storage.get(key);
         if (bytes == null) {
             throw new NoSuchElementException();
         }
-        return bytes;
+        if((long)bytes[1] == -1){
+            throw new NoSuchElementException("Element deleted");
+        }
+        return (byte[]) bytes[0];
     }
 
     /**
@@ -65,7 +69,8 @@ public class KVDaoImpl implements KVDao {
      */
     @Override
     public void upsert(@NotNull byte[] key, @NotNull byte[] value) {
-        storage.put(key, value);
+        Object[] obj = new Object[]{value, System.nanoTime()};
+        storage.put(key, obj);
     }
 
     /**
@@ -75,7 +80,8 @@ public class KVDaoImpl implements KVDao {
      */
     @Override
     public void remove(@NotNull byte[] key) {
-        storage.remove(key);
+        //storage.remove(key);
+        storage.put(key, new Object[]{new byte[]{} , -1L});
     }
 
     /**
