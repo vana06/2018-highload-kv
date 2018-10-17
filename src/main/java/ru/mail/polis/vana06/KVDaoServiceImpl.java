@@ -9,6 +9,7 @@ import ru.mail.polis.KVService;
 import java.io.IOException;
 import java.util.NoSuchElementException;
 import java.util.Set;
+import java.util.StringTokenizer;
 
 /**
  * Простой веб-сервер на основе one-nio
@@ -21,6 +22,8 @@ public class KVDaoServiceImpl extends HttpServer implements KVService {
     private final KVDao dao;
     @NotNull
     private final Set<String> topology;
+
+    private final RF defaultRF;
 
     /**
      * Инициализирует сервер на порту {@code port}
@@ -35,6 +38,7 @@ public class KVDaoServiceImpl extends HttpServer implements KVService {
         super(create(port));
         this.dao = dao;
         this.topology = topology;
+        defaultRF = new RF(topology.size() / 2 + 1, topology.size());
     }
 
     private static HttpServerConfig create(int port) {
@@ -65,10 +69,21 @@ public class KVDaoServiceImpl extends HttpServer implements KVService {
      * @throws IOException пробрасывается методом {@code sendError}
      */
     @Path("/v0/entity")
-    public void handler(Request request, HttpSession session, @Param("id=") String id) throws IOException{
+    public void handler(Request request, HttpSession session, @Param("id=") String id, @Param("replicas=") String replicas) throws IOException{
         if(id == null || id.isEmpty()){
             session.sendError(Response.BAD_REQUEST, null);
             return;
+        }
+
+        RF  rf;
+        if(replicas == null || replicas.isEmpty()){
+            rf = defaultRF;
+        } else {
+            try {
+                rf = new RF(replicas);
+            } catch (IllegalArgumentException e){
+                session.sendError(Response.BAD_REQUEST, e.getMessage());
+            }
         }
 
         try {
