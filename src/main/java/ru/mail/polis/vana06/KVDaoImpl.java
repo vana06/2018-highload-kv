@@ -19,7 +19,7 @@ import java.util.NoSuchElementException;
 public class KVDaoImpl implements KVDao {
 
     private final DB db;
-    private final HTreeMap<byte[], Object[]> storage;
+    private final HTreeMap<byte[], Value> storage;
 
     /**
      * Инициализирует хранилище
@@ -27,6 +27,7 @@ public class KVDaoImpl implements KVDao {
      */
     public KVDaoImpl(File data){
         File dataBase = new File(data, "dataBase");
+        Serializer<Value> serializer = new CustomSerializer();
         this.db = DBMaker
                 .fileDB(dataBase)
                 .fileMmapEnableIfSupported()
@@ -36,7 +37,7 @@ public class KVDaoImpl implements KVDao {
                 .make();
         this.storage = db.hashMap(data.getName())
                 .keySerializer(Serializer.BYTE_ARRAY)
-                .valueSerializer(new SerializerArrayTuple(Serializer.BYTE_ARRAY, Serializer.LONG))
+                .valueSerializer(serializer)
                 .createOrOpen();
     }
 
@@ -50,14 +51,21 @@ public class KVDaoImpl implements KVDao {
     @NotNull
     @Override
     public byte[] get(@NotNull byte[] key) throws NoSuchElementException, IllegalStateException {
-        Object[] bytes = storage.get(key);
-        if (bytes == null) {
+        Value value = internalGet(key);
+
+        if(value.getState() == Value.State.ABSENT || value.getState() == Value.State.REMOVED){
             throw new NoSuchElementException();
         }
-        if((long)bytes[1] == -1){
-            throw new NoSuchElementException("Element deleted");
+        return value.getData();
+    }
+
+    @NotNull
+    public Value internalGet(@NotNull byte[] key) {
+        Value value = storage.get(key);
+        if (value == null){
+            return new Value(new byte[]{}, 0, Value.State.ABSENT);
         }
-        return (byte[]) bytes[0];
+        return value;
     }
 
     /**
@@ -69,8 +77,8 @@ public class KVDaoImpl implements KVDao {
      */
     @Override
     public void upsert(@NotNull byte[] key, @NotNull byte[] value) {
-        Object[] obj = new Object[]{value, System.nanoTime()};
-        storage.put(key, obj);
+        Value upsertValue = new Value(value, System.nanoTime(), Value.State.PRESENT);
+        storage.put(key, upsertValue);
     }
 
     /**
@@ -81,7 +89,7 @@ public class KVDaoImpl implements KVDao {
     @Override
     public void remove(@NotNull byte[] key) {
         //storage.remove(key);
-        storage.put(key, new Object[]{new byte[]{} , -1L});
+        storage.put(key, new Value(new byte[]{}, System.nanoTime(), Value.State.REMOVED));
     }
 
     /**

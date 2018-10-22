@@ -6,4 +6,4 @@
 !*.java
 
 # ...even if they are in subdirectories
-!*/
+!*/**

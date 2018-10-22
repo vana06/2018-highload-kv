@@ -36,4 +36,11 @@ public class RF {
         }
     }
 
+    public int getAck() {
+        return ack;
+    }
+
+    public int getFrom() {
+        return from;
+    }
 }
