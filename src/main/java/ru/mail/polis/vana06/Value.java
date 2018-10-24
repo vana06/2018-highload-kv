@@ -13,7 +13,7 @@ public class Value implements Serializable{
     private final long timestamp;
     private final State state;
 
-    public Value(byte[] data, long timestamp, State state) {
+    Value(byte[] data, long timestamp, State state) {
         this.data = data;
         this.timestamp = timestamp;
         this.state = state;
@@ -23,11 +23,11 @@ public class Value implements Serializable{
         return data;
     }
 
-    public long getTimestamp() {
+    long getTimestamp() {
         return timestamp;
     }
 
-    public State getState() {
+    State getState() {
         return state;
     }
 

@@ -5,7 +5,6 @@ import org.mapdb.DB;
 import org.mapdb.DBMaker;
 import org.mapdb.HTreeMap;
 import org.mapdb.Serializer;
-import org.mapdb.serializer.SerializerArrayTuple;
 import ru.mail.polis.KVDao;
 
 import java.io.File;
@@ -60,7 +59,7 @@ public class KVDaoImpl implements KVDao {
     }
 
     @NotNull
-    public Value internalGet(@NotNull byte[] key) {
+    Value internalGet(@NotNull byte[] key) {
         Value value = storage.get(key);
         if (value == null){
             return new Value(new byte[]{}, 0, Value.State.ABSENT);
@@ -77,8 +76,7 @@ public class KVDaoImpl implements KVDao {
      */
     @Override
     public void upsert(@NotNull byte[] key, @NotNull byte[] value) {
-        Value upsertValue = new Value(value, System.nanoTime(), Value.State.PRESENT);
-        storage.put(key, upsertValue);
+        storage.put(key, new Value(value, System.currentTimeMillis(), Value.State.PRESENT));
     }
 
     /**
@@ -88,8 +86,7 @@ public class KVDaoImpl implements KVDao {
      */
     @Override
     public void remove(@NotNull byte[] key) {
-        //storage.remove(key);
-        storage.put(key, new Value(new byte[]{}, System.nanoTime(), Value.State.REMOVED));
+        storage.put(key, new Value(new byte[]{}, System.currentTimeMillis(), Value.State.REMOVED));
     }
 
     /**
