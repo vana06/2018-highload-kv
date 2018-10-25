@@ -13,7 +13,7 @@ public class Value implements Serializable{
     private final long timestamp;
     private final State state;
 
-    Value(byte[] data, long timestamp, State state) {
+    public Value(byte[] data, long timestamp, State state) {
         this.data = data;
         this.timestamp = timestamp;
         this.state = state;
@@ -23,15 +23,15 @@ public class Value implements Serializable{
         return data;
     }
 
-    long getTimestamp() {
+    public long getTimestamp() {
         return timestamp;
     }
 
-    State getState() {
+    public State getState() {
         return state;
     }
 
-    enum State {
+    public enum State {
         PRESENT,
         REMOVED,
         ABSENT

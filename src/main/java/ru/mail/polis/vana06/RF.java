@@ -2,7 +2,7 @@ package ru.mail.polis.vana06;
 
 import java.util.StringTokenizer;
 
-class RF {
+public class RF {
     private final String errorMsg = "The replicas parameter must contain 2 non-negative integer separated by a symbol \"/\" -> \"ack/from\"\n" +
             "The ack value must be less than or equal to the value of from";
     private final int ack, from;
@@ -33,7 +33,7 @@ class RF {
         }
     }
 
-    int getAck() {
+    public int getAck() {
         return ack;
     }
 

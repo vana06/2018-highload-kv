@@ -9,6 +9,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ru.mail.polis.KVDao;
 import ru.mail.polis.KVService;
+import ru.mail.polis.vana06.handler.DeleteHandler;
+import ru.mail.polis.vana06.handler.GetHandler;
+import ru.mail.polis.vana06.handler.PutHandler;
+import ru.mail.polis.vana06.handler.RequestHandler;
 
 import java.io.*;
 import java.util.*;
@@ -32,11 +36,9 @@ public class KVDaoServiceImpl extends HttpServer implements KVService {
 
     private static final Logger log = LoggerFactory.getLogger(KVDaoServiceImpl.class);
 
-    private final String PROXY_HEADER = "proxied";
-    private final String TIMESTAMP = "timestamp";
-    private final String STATE = "state";
+    public final static String PROXY_HEADER = "proxied";
     private final String STATUS_PATH = "/v0/status";
-    private final String ENTITY_PATH = "/v0/entity";
+    public final static String ENTITY_PATH = "/v0/entity";
 
     /**
      * Инициализирует сервер на порту {@code port}
@@ -138,13 +140,13 @@ public class KVDaoServiceImpl extends HttpServer implements KVService {
         try {
             switch (request.getMethod()){
                 case Request.METHOD_GET:
-                    session.sendResponse(get(id, nodes, rf, proxied));
+                    session.sendResponse(customHandler(new GetHandler("GET", dao, rf, id), nodes, proxied));
                     return;
                 case Request.METHOD_PUT:
-                    session.sendResponse(put(id, request.getBody(), nodes, rf, proxied));
+                    session.sendResponse(customHandler(new PutHandler("PUT", dao, rf, id, request.getBody()), nodes, proxied));
                     return;
                 case Request.METHOD_DELETE:
-                    session.sendResponse(delete(id, nodes, rf, proxied));
+                    session.sendResponse(customHandler(new DeleteHandler("DELETE", dao, rf, id), nodes, proxied));
                     return;
                 default:
                     log.error(request.getMethod() + " неподдерживаемый код метод");
@@ -173,110 +175,20 @@ public class KVDaoServiceImpl extends HttpServer implements KVService {
         session.sendError(Response.BAD_REQUEST, null);
     }
 
-    /**
-     * Обработка GET запроса
-     *
-     * @param id ключ
-     * @param nodes доступные ноды
-     * @param rf текущая replica factor
-     * @param proxied является ли текущая нода прокси сервером
-     * @return
-     * <ol>
-     * <li> 200 OK и данные, если ответили хотя бы ack из from реплик </li>
-     * <li> 404 Not Found, если ни одна из ack реплик, вернувших ответ, не содержит данные (либо данные удалены хотя бы на одной из ack ответивших реплик) </li>
-     * <li> 504 Not Enough Replicas, если не получили 200/404 от ack реплик из всего множества from реплик </li>
-     * </ol>
-     * @throws IOException в случае внутренних ошибок на сервере
-     * @throws NoSuchElementException если элемент не был найден по ключу
-     */
-    private Response get(String id, String[] nodes, RF rf, boolean proxied) throws IOException, NoSuchElementException{
+    private Response customHandler(RequestHandler rh, String[] nodes, boolean proxied) throws IOException, NoSuchElementException{
         if(proxied){
-            Value value = dao.internalGet(id.getBytes());
-            if(value.getState() == Value.State.PRESENT || value.getState() == Value.State.ABSENT){
-                Response response = new Response(Response.OK, value.getData());
-                response.addHeader(TIMESTAMP + String.valueOf(value.getTimestamp()));
-                response.addHeader(STATE + value.getState().name());
-                return response;
-            } else if(value.getState() == Value.State.REMOVED){
-                throw new NoSuchElementException();
-            }
+            return rh.onProxied();
         }
-
-        List<Value> values = new ArrayList<>();
 
         int acks = 0;
         for (final String node : nodes){
             if(node.equals(me)){
-                Value value = dao.internalGet(id.getBytes());
-                if(value.getState() == Value.State.PRESENT || value.getState() == Value.State.ABSENT){
+                if(rh.ifMe()) {
                     acks++;
-                    values.add(value);
-                } else if(value.getState() == Value.State.REMOVED){
-                    throw new NoSuchElementException();
                 }
             } else {
                 try {
-                    final Response response = clients.get(node).get(ENTITY_PATH + "?id=" + id, PROXY_HEADER);
-
-                    if(response.getStatus() == 200){
-                        values.add(new Value(response.getBody(), Long.valueOf(response.getHeader(TIMESTAMP)),
-                                Value.State.valueOf(response.getHeader(STATE))));
-
-                        acks++;
-                    } else if(response.getStatus() == 404){
-                        throw new NoSuchElementException();
-                    }
-                } catch (InterruptedException | PoolException | HttpException e) {
-                    log.error(e.getMessage(), e);
-                }
-            }
-        }
-
-        if(acks >= rf.getAck()){
-            if(values.stream().anyMatch(value -> value.getState() == Value.State.PRESENT)){
-                Value max = values
-                        .stream()
-                        .max(Comparator.comparing(Value::getTimestamp))
-                        .get();
-                return success("GET", Response.OK, acks, rf, max.getData());
-            } else {
-                throw new NoSuchElementException();
-            }
-        } else {
-            return gatewayTimeout("GET", acks, rf);
-        }
-    }
-
-    /**
-     * Обработка PUT запроса
-     *
-     * @param id ключ
-     * @param value значение
-     * @param nodes доступные ноды
-     * @param rf текущая replica factor
-     * @param proxied является ли текущая нода прокси сервером
-     * @return
-     * <ol>
-     * <li> 201 Created, если хотя бы ack из from реплик подтвердили операцию </li>
-     * <li> 504 Not Enough Replicas, если не набралось ack подтверждений из всего множества from реплик </li>
-     * </ol>
-     * @throws IOException в случае внутренних ошибок на сервере
-     */
-    private Response put(String id, byte[] value, String[] nodes, RF rf, boolean proxied) throws IOException {
-        if(proxied){
-            dao.upsert(id.getBytes(), value);
-            return new Response(Response.CREATED, Response.EMPTY);
-        }
-
-        int acks = 0;
-        for (final String node : nodes){
-            if(node.equals(me)){
-                dao.upsert(id.getBytes(), value);
-                acks++;
-            } else {
-                try {
-                    final Response response = clients.get(node).put(ENTITY_PATH + "?id=" + id, value, PROXY_HEADER);
-                    if(response.getStatus() == 201){
+                    if(rh.ifNotMe(clients.get(node))){
                         acks++;
                     }
                 } catch (InterruptedException | PoolException | HttpException e) {
@@ -284,57 +196,7 @@ public class KVDaoServiceImpl extends HttpServer implements KVService {
                 }
             }
         }
-
-        if(acks >= rf.getAck()){
-            return success("PUT", Response.CREATED, acks, rf, Response.EMPTY);
-        } else {
-            return gatewayTimeout("PUT", acks, rf);
-        }
-    }
-
-    /**
-     * Обработка DELETE запроса
-     *
-     * @param id ключ
-     * @param nodes доступные ноды
-     * @param rf текущая replica factor
-     * @param proxied является ли текущая нода прокси сервером
-     * @return
-     * <ol>
-     * <li> 202 Accepted, если хотя бы ack из from реплик подтвердили операцию </li>
-     * <li> 504 Not Enough Replicas, если не набралось ack подтверждений из всего множества from реплик </li>
-     * </ol>
-     * @throws IOException в случае внутренних ошибок на сервере
-     */
-    private Response delete(String id, String[] nodes, RF rf, boolean proxied) throws IOException {
-        if(proxied){
-            dao.remove(id.getBytes());
-            return new Response(Response.ACCEPTED, Response.EMPTY);
-        }
-
-        int acks = 0;
-        for (final String node : nodes){
-            if(node.equals(me)){
-                dao.remove(id.getBytes());
-                acks++;
-            } else {
-                try {
-                    final Response response = clients.get(node).delete(ENTITY_PATH + "?id=" + id, PROXY_HEADER);
-                    if(response.getStatus() == 202){
-                        acks++;
-                    }
-                } catch (InterruptedException | PoolException | HttpException e) {
-                    log.error(e.getMessage(), e);
-                }
-            }
-        }
-
-        if(acks >= rf.getAck()){
-            return success("DELETE", Response.ACCEPTED, acks, rf, Response.EMPTY);
-        } else {
-            return gatewayTimeout("DELETE", acks, rf);
-        }
-
+        return rh.getResponse(acks);
     }
 
     /**
@@ -369,15 +231,6 @@ public class KVDaoServiceImpl extends HttpServer implements KVService {
             default:
                 return "UNSUPPORTED " + method;
         }
-    }
-
-    private Response gatewayTimeout(String method, int acks, RF rf){
-        log.info("Операция " + method + " не выполнена, acks = " + acks + " ; требования - " + rf);
-        return new Response(Response.GATEWAY_TIMEOUT, Response.EMPTY);
-    }
-    private Response success(String method, String responseName, int acks, RF rf, byte[] body){
-        log.info("Операция " + method + " выполнена успешно в " + acks + " нодах; требования - " + rf);
-        return new Response(responseName, body);
     }
 
     @Override

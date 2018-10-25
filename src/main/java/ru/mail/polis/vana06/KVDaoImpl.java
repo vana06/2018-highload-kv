@@ -59,7 +59,7 @@ public class KVDaoImpl implements KVDao {
     }
 
     @NotNull
-    Value internalGet(@NotNull byte[] key) {
+    public Value internalGet(@NotNull byte[] key) {
         Value value = storage.get(key);
         if (value == null){
             return new Value(new byte[]{}, 0, Value.State.ABSENT);
