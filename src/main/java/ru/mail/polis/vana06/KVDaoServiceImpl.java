@@ -43,8 +43,8 @@ public class KVDaoServiceImpl extends HttpServer implements KVService {
     /**
      * Инициализирует сервер на порту {@code port}
      *
-     * @param port порт для инициализации
-     * @param dao хранилище данных
+     * @param port     порт для инициализации
+     * @param dao      хранилище данных
      * @param topology топология всех кластеров
      * @throws IOException пробрасывает суперкласс {@code HttpServer}
      */
@@ -67,7 +67,11 @@ public class KVDaoServiceImpl extends HttpServer implements KVService {
                 .stream(this.topology)
                 .filter(node -> node.endsWith(String.valueOf(port)))
                 .findFirst()
-                .orElse(null);
+                .orElseThrow(() -> {
+                    IOException e = new IOException("Сервер на порту " + port + " не присутствует в топологии кластеров " + Arrays.toString(this.topology));
+                    log.info(e.getMessage(), e);
+                    return e;
+                });
 
         log.info("Сервер на порту " + port + " был запущен");
     }
@@ -94,9 +98,9 @@ public class KVDaoServiceImpl extends HttpServer implements KVService {
     /**
      * Метод обрабатывает реализованные в сервисе функции, такие как GET, PUT, DELETE
      *
-     * @param request данные запросы
-     * @param session реализует методы для ответа
-     * @param id - непустая последовательность символов, используется как ключ
+     * @param request  данные запросы
+     * @param session  реализует методы для ответа
+     * @param id       - непустая последовательность символов, используется как ключ
      * @param replicas содержит количетство узлов, которые должны подтвердить операцию, чтобы она считалась выполненной успешно
      * @throws IOException пробрасывается методом {@code sendError}
      */
@@ -104,22 +108,22 @@ public class KVDaoServiceImpl extends HttpServer implements KVService {
     public void handler(Request request,
                         HttpSession session,
                         @Param("id=") String id,
-                        @Param("replicas=") String replicas) throws IOException{
+                        @Param("replicas=") String replicas) throws IOException {
         log.info("Запрос от " + request.getHost() + "; URI = " + request.getURI());
 
-        if(id == null || id.isEmpty()){
+        if (id == null || id.isEmpty()) {
             log.error("id = " + id + " не удовлетворяет требованиям");
             session.sendError(Response.BAD_REQUEST, null);
             return;
         }
 
         RF rf;
-        if(replicas == null || replicas.isEmpty()){
+        if (replicas == null || replicas.isEmpty()) {
             rf = defaultRF;
         } else {
             try {
                 rf = new RF(replicas);
-            } catch (IllegalArgumentException e){
+            } catch (IllegalArgumentException e) {
                 log.error(e.getMessage(), e);
                 session.sendError(Response.BAD_REQUEST, null);
                 return;
@@ -138,7 +142,7 @@ public class KVDaoServiceImpl extends HttpServer implements KVService {
         boolean proxied = request.getHeader(PROXY_HEADER) != null;
         log.info("Тип запроса - " + getMethodName(request.getMethod()) + "; proxied - " + proxied);
         try {
-            switch (request.getMethod()){
+            switch (request.getMethod()) {
                 case Request.METHOD_GET:
                     session.sendResponse(customHandler(new GetHandler("GET", dao, rf, id), nodes, proxied));
                     return;
@@ -155,7 +159,7 @@ public class KVDaoServiceImpl extends HttpServer implements KVService {
         } catch (NoSuchElementException e) {
             log.info("Элемент по ключу " + id + " не найден", e);
             session.sendError(Response.NOT_FOUND, null);
-        } catch (IOException e){
+        } catch (IOException e) {
             log.info("Внутренняя ошибка сервера", e);
             session.sendError(Response.INTERNAL_ERROR, null);
         }
@@ -175,20 +179,20 @@ public class KVDaoServiceImpl extends HttpServer implements KVService {
         session.sendError(Response.BAD_REQUEST, null);
     }
 
-    private Response customHandler(RequestHandler rh, String[] nodes, boolean proxied) throws IOException, NoSuchElementException{
-        if(proxied){
+    private Response customHandler(RequestHandler rh, String[] nodes, boolean proxied) throws IOException, NoSuchElementException {
+        if (proxied) {
             return rh.onProxied();
         }
 
         int acks = 0;
-        for (final String node : nodes){
-            if(node.equals(me)){
-                if(rh.ifMe()) {
+        for (final String node : nodes) {
+            if (node.equals(me)) {
+                if (rh.ifMe()) {
                     acks++;
                 }
             } else {
                 try {
-                    if(rh.ifNotMe(clients.get(node))){
+                    if (rh.ifNotMe(clients.get(node))) {
                         acks++;
                     }
                 } catch (InterruptedException | PoolException | HttpException e) {
@@ -202,26 +206,26 @@ public class KVDaoServiceImpl extends HttpServer implements KVService {
     /**
      * Формирует ноды для работы
      *
-     * @param id ключ
+     * @param id    ключ
      * @param count количество нод
      * @return список используемых нод
      * @throws IllegalArgumentException в случае, когда count больше числа доступных нод
      */
-    private String[] replicas(String id, int count) throws IllegalArgumentException{
-        if(count > topology.length){
+    private String[] replicas(String id, int count) throws IllegalArgumentException {
+        if (count > topology.length) {
             throw new IllegalArgumentException("The from value must be less or equal to the total count of nodes = " + topology.length);
         }
         String[] result = new String[count];
         int i = (id.hashCode() & Integer.MAX_VALUE) % topology.length;
-        for(int j = 0; j < count; j++){
+        for (int j = 0; j < count; j++) {
             result[j] = topology[i];
             i = (i + 1) % topology.length;
         }
         return result;
     }
 
-    private String getMethodName(int method){
-        switch (method){
+    private String getMethodName(int method) {
+        switch (method) {
             case Request.METHOD_GET:
                 return "GET";
             case Request.METHOD_PUT:

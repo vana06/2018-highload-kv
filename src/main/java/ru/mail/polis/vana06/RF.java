@@ -7,15 +7,15 @@ public class RF {
             "The ack value must be less than or equal to the value of from";
     private final int ack, from;
 
-    RF(String replicas) throws IllegalArgumentException{
+    RF(String replicas) throws IllegalArgumentException {
         StringTokenizer st = new StringTokenizer(replicas, "/");
-        if (st.countTokens() != 2){
+        if (st.countTokens() != 2) {
             throw new IllegalArgumentException(errorMsg);
         }
         try {
             ack = Integer.parseInt(st.nextToken());
             from = Integer.parseInt(st.nextToken());
-        } catch (NumberFormatException e){
+        } catch (NumberFormatException e) {
             throw new IllegalArgumentException(errorMsg);
         }
         validate();
@@ -27,8 +27,8 @@ public class RF {
         validate();
     }
 
-    private void validate() throws IllegalArgumentException{
-        if(ack > from || ack <= 0){
+    private void validate() throws IllegalArgumentException {
+        if (ack > from || ack <= 0) {
             throw new IllegalArgumentException(errorMsg);
         }
     }

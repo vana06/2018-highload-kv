@@ -33,10 +33,10 @@ public abstract class RequestHandler {
 
     /**
      * @param methodName название обрабатываемого метода
-     * @param dao хранилище данных
-     * @param rf replica factor
-     * @param id ключ
-     * @param value значение; может быть null и применяется только для обработки метода PUT
+     * @param dao        хранилище данных
+     * @param rf         replica factor
+     * @param id         ключ
+     * @param value      значение; может быть null и применяется только для обработки метода PUT
      */
     RequestHandler(String methodName, @NotNull KVDao dao, @NotNull RF rf, String id, byte[] value) {
         this.methodName = methodName;
@@ -67,14 +67,16 @@ public abstract class RequestHandler {
      *
      * @param client нода, на которой должна проводится обработка
      * @return true если не было исключений и все условия успешности запроса соблюдены
-     * @throws InterruptedException ошибка при запросе на клиент
-     * @throws PoolException ошмбка при запросе на клиент
-     * @throws HttpException ошибка при запросе на клиент
-     * @throws IOException внутреннаяя ошибка на сервере
+     * @throws InterruptedException   ошибка при запросе на клиент
+     * @throws PoolException          ошмбка при запросе на клиент
+     * @throws HttpException          ошибка при запросе на клиент
+     * @throws IOException            внутреннаяя ошибка на сервере
      * @throws NoSuchElementException возвращает метод GET, если данные были удалены
      */
     public abstract boolean ifNotMe(HttpClient client) throws InterruptedException, PoolException, HttpException, IOException, NoSuchElementException;
+
     abstract Response onSuccess(int acks);
+
     abstract Response onFail(int acks);
 
     /**
@@ -85,19 +87,20 @@ public abstract class RequestHandler {
      * @param acks набранное количество ack
      * @return ответ на полученный запрос
      */
-    public Response getResponse(int acks){
-        if(acks >= rf.getAck()){
+    public Response getResponse(int acks) {
+        if (acks >= rf.getAck()) {
             return onSuccess(acks);
         } else {
             return onFail(acks);
         }
     }
 
-    Response gatewayTimeout(int acks){
+    Response gatewayTimeout(int acks) {
         log.info("Операция " + methodName + " не выполнена, acks = " + acks + " ; требования - " + rf);
         return new Response(Response.GATEWAY_TIMEOUT, Response.EMPTY);
     }
-    Response success(String responseName, int acks, byte[] body){
+
+    Response success(String responseName, int acks, byte[] body) {
         log.info("Операция " + methodName + " выполнена успешно в " + acks + " нодах; требования - " + rf);
         return new Response(responseName, body);
     }

@@ -8,7 +8,7 @@ import org.mapdb.Serializer;
 import java.io.IOException;
 import java.io.Serializable;
 
-public class Value implements Serializable{
+public class Value implements Serializable {
     private final byte[] data;
     private final long timestamp;
     private final State state;

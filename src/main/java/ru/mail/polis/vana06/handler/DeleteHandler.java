@@ -50,8 +50,7 @@ public class DeleteHandler extends RequestHandler {
 
     /**
      * @param acks набранное количество ack
-     * @return
-     * <ol>
+     * @return <ol>
      * <li> 202 Accepted, если хотя бы ack из from реплик подтвердили операцию </li>
      * <li> 504 Not Enough Replicas, если не набралось ack подтверждений из всего множества from реплик </li>
      * </ol>
