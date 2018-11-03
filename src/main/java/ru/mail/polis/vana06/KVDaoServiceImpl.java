@@ -109,7 +109,7 @@ public class KVDaoServiceImpl extends HttpServer implements KVService {
                         HttpSession session,
                         @Param("id=") String id,
                         @Param("replicas=") String replicas) throws IOException {
-        log.info("Запрос от " + request.getHost() + "; URI = " + request.getURI());
+        log.info("Параметры запроса:\n" + request);
 
         if (id == null || id.isEmpty()) {
             log.error("id = " + id + " не удовлетворяет требованиям");
@@ -160,10 +160,10 @@ public class KVDaoServiceImpl extends HttpServer implements KVService {
             log.info("Элемент по ключу " + id + " не найден", e);
             session.sendError(Response.NOT_FOUND, null);
         } catch (IOException e) {
-            log.info("Внутренняя ошибка сервера", e);
+            log.error("Внутренняя ошибка сервера", e);
+            log.error("Параметры запроса:\n" + request);
             session.sendError(Response.INTERNAL_ERROR, null);
         }
-
     }
 
     /**
@@ -175,7 +175,7 @@ public class KVDaoServiceImpl extends HttpServer implements KVService {
      */
     @Override
     public void handleDefault(Request request, HttpSession session) throws IOException {
-        log.error("Неподдерживаемый запрос от " + request.getHost() + "; URI = " + request.getURI());
+        log.error("Неподдерживаемый запрос\n" + request);
         session.sendError(Response.BAD_REQUEST, null);
     }
 

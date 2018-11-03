@@ -75,8 +75,20 @@ public abstract class RequestHandler {
      */
     public abstract boolean ifNotMe(HttpClient client) throws InterruptedException, PoolException, HttpException, IOException, NoSuchElementException;
 
+    /**
+     * Ответ на запрос при удачном выполнении, если ответили хотя бы ack из from реплик
+     *
+     * @param acks количество ответивших реплик
+     * @return ответ на полученный запрос
+     */
     abstract Response onSuccess(int acks);
 
+    /**
+     * Ответ на запрос при неудачном выполнении, если числов ответивших реплик ack меньше чем заданное число from
+     *
+     * @param acks количество ответивших реплик
+     * @return ответ на полученный запрос
+     */
     abstract Response onFail(int acks);
 
     /**
@@ -95,11 +107,25 @@ public abstract class RequestHandler {
         }
     }
 
+    /**
+     * Шаблон, формирующий ответ на запрос при его неудачном выполнении
+     *
+     * @param acks количество ответивших реплик
+     * @return ответ на полученный запрос
+     */
     Response gatewayTimeout(int acks) {
         log.info("Операция " + methodName + " не выполнена, acks = " + acks + " ; требования - " + rf);
         return new Response(Response.GATEWAY_TIMEOUT, Response.EMPTY);
     }
 
+    /**
+     * Шаблон, формирующий ответ на запрос при его удачном выполнении
+     *
+     * @param responseName имя запсроса, на который формируем ответ
+     * @param acks         количество ответивших реплик
+     * @param body         тело возвращаемого запроса
+     * @return ответ на полученный запрос
+     */
     Response success(String responseName, int acks, byte[] body) {
         log.info("Операция " + methodName + " выполнена успешно в " + acks + " нодах; требования - " + rf);
         return new Response(responseName, body);
