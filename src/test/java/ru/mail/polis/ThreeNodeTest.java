@@ -53,9 +53,9 @@ class ThreeNodeTest extends ClusterTestBase {
 
     @BeforeEach
     void beforeEach() throws Exception {
-        port0 = randomPort();
-        port1 = randomPort();
-        port2 = randomPort();
+        port0 = getFreePort();
+        port1 = getFreePort();
+        port2 = getFreePort();
         endpoints = new LinkedHashSet<>(Arrays.asList(endpoint(port0), endpoint(port1), endpoint(port2)));
         data0 = Files.createTempDirectory();
         data1 = Files.createTempDirectory();

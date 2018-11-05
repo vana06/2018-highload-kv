@@ -49,8 +49,8 @@ class TwoNodeTest extends ClusterTestBase {
 
     @BeforeEach
     void beforeEach() throws Exception {
-        port0 = randomPort();
-        port1 = randomPort();
+        port0 = getFreePort();
+        port1 = getFreePort();
         endpoints = new LinkedHashSet<>(Arrays.asList(endpoint(port0), endpoint(port1)));
         data0 = Files.createTempDirectory();
         dao0 = KVDaoFactory.create(data0);

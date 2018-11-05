@@ -18,6 +18,8 @@ package ru.mail.polis;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.io.IOException;
+import java.net.ServerSocket;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -31,6 +33,15 @@ abstract class TestBase {
 
     static int randomPort() {
         return ThreadLocalRandom.current().nextInt(30000, 40000);
+    }
+
+    static int getFreePort() throws IOException {
+        try (ServerSocket socket = new ServerSocket(0)) {
+            socket.setReuseAddress(true);
+            return socket.getLocalPort();
+        } catch (IOException e) {
+            throw new IOException(e);
+        }
     }
 
     @NotNull
