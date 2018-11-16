@@ -28,7 +28,10 @@ dependencies {
     compile("org.mapdb:mapdb:3.0.5")
 
     //SLF4J
-    compile("org.slf4j:slf4j-simple:1.6.1");
+    compile("org.slf4j:slf4j-api:1.7.25");
+    //logback
+    compile("ch.qos.logback:logback-classic:1.2.3")
+    compile("ch.qos.logback:logback-core:1.2.3")
 }
 
 tasks {
