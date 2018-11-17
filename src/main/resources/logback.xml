@@ -1,29 +1,29 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <configuration>
-    <timestamp key="byDay" datePattern="yyyyMMdd'T'HHmmss"/>
 
-    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+    <appender name="ROLLING" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>out/logs/log-%d{yyyy-MM-dd}.%i.txt</fileNamePattern>
+            <!-- each file should be at most 1GB, keep 60 days worth of history, but at most 200GB -->
+            <maxFileSize>1GB</maxFileSize>
+            <maxHistory>60</maxHistory>
+            <totalSizeCap>200GB</totalSizeCap>
+        </rollingPolicy>
         <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            <pattern>%-4relative %-5level %logger{35} - %msg%n</pattern>
         </encoder>
     </appender>
 
-    <appender name="ASYNC" class="ch.qos.logback.classic.AsyncAppender">
-        <appender-ref ref="STDOUT" />
-        <queueSize>1000</queueSize>
-    </appender>
-
-    <appender name="FILE" class="ch.qos.logback.core.FileAppender">
-        <file> out/logs/log-${byDay}.txt </file>
-        <append>true</append>
-        <encoder>
-            <pattern>%-4relative [%thread] %-5level %logger{35} - %msg%n</pattern>
-        </encoder>
+    <appender name="ASYNC-FILE" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="ROLLING" />
+        <queueSize>500</queueSize>
+        <maxFlushTime>5000</maxFlushTime>
+        <discardingThreshold>0</discardingThreshold>
     </appender>
 
     <root level="INFO">
-        <appender-ref ref="FILE"/>
+        <appender-ref ref="ASYNC-FILE"/>
     </root>
 
 </configuration>
