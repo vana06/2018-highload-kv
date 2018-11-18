@@ -12,13 +12,15 @@ import ru.mail.polis.vana06.KVDaoImpl;
 import ru.mail.polis.vana06.RF;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.NoSuchElementException;
+import java.util.concurrent.*;
 
 /**
  * Шаблон для обработчика запросов
  */
 public abstract class RequestHandler {
-    final String methodName;
+    private final String methodName;
     @NotNull
     final KVDaoImpl dao;
     @NotNull
@@ -57,23 +59,25 @@ public abstract class RequestHandler {
     /**
      * Обработка запроса если proxied == false, но обработка выполняется для проксируемой ноды
      *
-     * @return true если не было исключений и все условия успешности запроса соблюдены
+     * @return Callable содержащий true, если не было исключений и все условия успешности запроса соблюдены
      * @throws IOException в случае внутрненних ошибок
      */
-    public abstract boolean ifMe() throws IOException;
+    public abstract Callable<Boolean> ifMe() throws IOException;
 
     /**
      * Обработка запроса если proxied == false и обработка проводится на другой ноде
      *
      * @param client нода, на которой должна проводится обработка
-     * @return true если не было исключений и все условия успешности запроса соблюдены
-     * @throws InterruptedException   ошибка при запросе на клиент
-     * @throws PoolException          ошмбка при запросе на клиент
-     * @throws HttpException          ошибка при запросе на клиент
-     * @throws IOException            внутреннаяя ошибка на сервере
-     * @throws NoSuchElementException возвращает метод GET, если данные были удалены
+     * @return Callable содержащий true, если не было исключений и все условия успешности запроса соблюдены
+     * <p>Callable может содержать следующий исключения <ol>
+     * <li>InterruptedException   ошибка при запросе на клиент</li>
+     * <li>PoolException          ошмбка при запросе на клиент</li>
+     * <li>HttpException          ошибка при запросе на клиент</li>
+     * <li>IOException            внутреннаяя ошибка на сервере</li>
+     * <li>NoSuchElementException возвращает метод GET, если данные были удалены</li>
+     * </ol>
      */
-    public abstract boolean ifNotMe(HttpClient client) throws InterruptedException, PoolException, HttpException, IOException, NoSuchElementException;
+    public abstract Callable<Boolean> ifNotMe(HttpClient client);
 
     /**
      * Ответ на запрос при удачном выполнении, если ответили хотя бы ack из from реплик
@@ -96,15 +100,26 @@ public abstract class RequestHandler {
      * В случае успеха вызывает {@code onSuccess(int acks)} <p>
      * В случае провала вызывает {@code onFail(int acks)}
      *
-     * @param acks набранное количество ack
+     * @param futures список будущих ack
      * @return ответ на полученный запрос
      */
-    public Response getResponse(int acks) {
-        if (acks >= rf.getAck()) {
-            return onSuccess(acks);
-        } else {
-            return onFail(acks);
+    public Response getResponse(ArrayList<Future<Boolean>> futures) {
+        int acks = 0;
+
+        for (Future<Boolean> future : futures) {
+            try {
+                if (future.get()) {
+                    acks++;
+                    if (acks >= rf.getAck()) {
+                        return onSuccess(acks);
+                    }
+                }
+            } catch (ExecutionException | InterruptedException e) {
+                log.error(e.getMessage(), e);
+            }
         }
+
+        return onFail(acks);
     }
 
     /**

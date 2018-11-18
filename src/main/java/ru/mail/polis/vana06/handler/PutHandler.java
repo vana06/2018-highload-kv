@@ -10,7 +10,12 @@ import ru.mail.polis.vana06.KVDaoServiceImpl;
 import ru.mail.polis.vana06.RF;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.NoSuchElementException;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeoutException;
 
 public class PutHandler extends RequestHandler {
     public PutHandler(@NotNull String methodName, @NotNull KVDao dao, @NotNull RF rf, String id, byte[] value) {
@@ -24,15 +29,19 @@ public class PutHandler extends RequestHandler {
     }
 
     @Override
-    public boolean ifMe() {
-        dao.upsert(id.getBytes(), value);
-        return true;
+    public Callable<Boolean> ifMe() {
+        return () -> {
+            dao.upsert(id.getBytes(), value);
+            return true;
+        };
     }
 
     @Override
-    public boolean ifNotMe(HttpClient client) throws InterruptedException, PoolException, HttpException, IOException, NoSuchElementException {
-        final Response response = client.put(KVDaoServiceImpl.ENTITY_PATH + "?id=" + id, value, KVDaoServiceImpl.PROXY_HEADER);
-        return response.getStatus() == 201;
+    public Callable<Boolean> ifNotMe(HttpClient client) {
+        return () -> {
+            final Response response = client.put(KVDaoServiceImpl.ENTITY_PATH + "?id=" + id, value, KVDaoServiceImpl.PROXY_HEADER);
+            return response.getStatus() == 201;
+        };
     }
 
     @Override
@@ -46,14 +55,14 @@ public class PutHandler extends RequestHandler {
     }
 
     /**
-     * @param acks набранное количество ack
+     * @param futures список будущих ack
      * @return <ol>
      * <li> 201 Created, если хотя бы ack из from реплик подтвердили операцию </li>
      * <li> 504 Not Enough Replicas, если не набралось ack подтверждений из всего множества from реплик </li>
      * </ol>
      */
     @Override
-    public Response getResponse(int acks) {
-        return super.getResponse(acks);
+    public Response getResponse(ArrayList<Future<Boolean>> futures) {
+        return super.getResponse(futures);
     }
 }
