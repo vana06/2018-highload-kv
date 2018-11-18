@@ -1,20 +1,15 @@
 package ru.mail.polis.vana06.handler;
 
 import one.nio.http.HttpClient;
-import one.nio.http.HttpException;
 import one.nio.http.Response;
-import one.nio.pool.PoolException;
 import org.jetbrains.annotations.NotNull;
 import ru.mail.polis.KVDao;
 import ru.mail.polis.vana06.KVDaoServiceImpl;
 import ru.mail.polis.vana06.RF;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeoutException;
 
 /**
  * Обработка DELETE запроса

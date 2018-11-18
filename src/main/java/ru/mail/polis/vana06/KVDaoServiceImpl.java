@@ -36,7 +36,7 @@ public class KVDaoServiceImpl extends HttpServer implements KVService {
 
     private static final Logger log = LoggerFactory.getLogger(KVDaoServiceImpl.class);
 
-    private final int THREAD_COUNT = 9;
+    private final int THREAD_COUNT = 500;
     private final ExecutorService executor = Executors.newFixedThreadPool(THREAD_COUNT);
 
     public final static String PROXY_HEADER = "proxied";

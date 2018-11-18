@@ -1,24 +1,19 @@
 package ru.mail.polis.vana06.handler;
 
 import one.nio.http.HttpClient;
-import one.nio.http.HttpException;
 import one.nio.http.Response;
-import one.nio.pool.PoolException;
 import org.jetbrains.annotations.NotNull;
 import ru.mail.polis.KVDao;
 import ru.mail.polis.vana06.KVDaoServiceImpl;
 import ru.mail.polis.vana06.RF;
 import ru.mail.polis.vana06.Value;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeoutException;
 
 public class GetHandler extends RequestHandler {
     private List<Value> values = new ArrayList<>();
@@ -61,7 +56,7 @@ public class GetHandler extends RequestHandler {
                 .stream()
                 .max(Comparator.comparing(Value::getTimestamp))
                 .get();
-        if(max.getState() == Value.State.PRESENT){
+        if (max.getState() == Value.State.PRESENT) {
             return success(Response.OK, acks, max.getData());
         } else {
             throw new NoSuchElementException();

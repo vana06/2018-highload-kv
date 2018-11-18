@@ -1,9 +1,7 @@
 package ru.mail.polis.vana06.handler;
 
 import one.nio.http.HttpClient;
-import one.nio.http.HttpException;
 import one.nio.http.Response;
-import one.nio.pool.PoolException;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

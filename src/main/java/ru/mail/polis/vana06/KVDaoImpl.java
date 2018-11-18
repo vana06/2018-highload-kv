@@ -30,8 +30,6 @@ public class KVDaoImpl implements KVDao {
                 .fileMmapEnableIfSupported()
                 .fileMmapPreclearDisable()
                 .fileChannelEnable()
-                .allocateStartSize(1024 * 1024 * 1024L)  // 1GB
-                .allocateIncrement(128 * 1024 * 1024)    // 128MB
                 .closeOnJvmShutdown()
                 .make();
         this.storage = db.hashMap(data.getName())
