@@ -22,6 +22,11 @@ public class AmmoGenerator {
     }
 
     @NotNull
+    private static String randomKey(Random random) {
+        return Long.toHexString(random.nextLong());
+    }
+
+    @NotNull
     private static byte[] randomValue() {
         final byte[] result = new byte[VALUE_LENGTH];
         ThreadLocalRandom.current().nextBytes(result);
@@ -44,8 +49,11 @@ public class AmmoGenerator {
         System.out.write("\r\n".getBytes());
     }
 
-    private static void get() throws IOException {
-        final String key = randomKey();
+    private static void get(String key) throws IOException {
+        if (key == null){
+            key = randomKey();
+        }
+        //final String key = randomKey();
         final ByteArrayOutputStream request = new ByteArrayOutputStream();
         try (Writer writer = new OutputStreamWriter(request)) {
             writer.write("GET /v0/entity?id=" + key + "&replicas=" + ACK + "/" + FROM + " HTTP/1.1\r\n");
@@ -55,6 +63,11 @@ public class AmmoGenerator {
         System.out.write(" get\n".getBytes());
         request.writeTo(System.out);
         System.out.write("\r\n".getBytes());
+    }
+
+    private static void mix(String key) throws IOException {
+        put();
+        get(key);
     }
 
     public static void main(String[] args) throws IOException {
@@ -97,29 +110,30 @@ public class AmmoGenerator {
                 break;
             case "get":
                 for (int i = 0; i < requestsWithoutRepeat; i++) {
-                    get();
+                    get(null);
                 }
                 random = new Random(SEED);
                 for (int i = 0; i < requestsWithRepeat; i++) {
-                    get();
+                    get(null);
                 }
                 break;
             case "put+get":
             case "get+put":
-                for (int i = 0; i < requestsWithoutRepeat / 2; i++) {
+                for (int i = 0; i < requestsWithoutRepeat * 0.1; i++) {
                     put();
                 }
+                Random randomGet = new Random(SEED);
+                for (int i = 0; i < requestsWithoutRepeat * 0.9; i++) {
+                    mix(randomKey(randomGet));
+                }
+
                 random = new Random(SEED);
-                for (int i = 0; i < requestsWithRepeat / 2; i++) {
+                for (int i = 0; i < requestsWithRepeat * 0.1; i++) {
                     put();
                 }
-                random = new Random(SEED);
-                for (int i = 0; i < requestsWithoutRepeat / 2; i++) {
-                    get();
-                }
-                random = new Random(SEED);
-                for (int i = 0; i < requestsWithRepeat / 2; i++) {
-                    get();
+                randomGet = new Random(SEED);
+                for (int i = 0; i < requestsWithRepeat * 0.9; i++) {
+                    mix(randomKey(randomGet));
                 }
                 break;
             default:
