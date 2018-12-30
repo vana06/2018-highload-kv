@@ -18,15 +18,15 @@ import java.util.concurrent.Future;
 public class GetHandler extends RequestHandler {
     private List<Value> values = new ArrayList<>();
 
-    public GetHandler(@NotNull String methodName, @NotNull KVDao dao, @NotNull RF rf, String id) {
-        super(methodName, dao, rf, id, null);
+    public GetHandler(@NotNull String methodName, @NotNull KVDao dao, @NotNull RF rf, String id, Long part) {
+        super(methodName, dao, rf, id, part, null);
     }
 
     @Override
     public Response onProxied() throws NoSuchElementException {
-        Value value = dao.internalGet(id.getBytes());
+        Value value = dao.internalGet(id.getBytes(), part);
         Response response = new Response(Response.OK, value.getData());
-        response.addHeader(TIMESTAMP + String.valueOf(value.getTimestamp()));
+        response.addHeader(TIMESTAMP + value.getTimestamp());
         response.addHeader(STATE + value.getState().name());
         return response;
     }
@@ -34,7 +34,7 @@ public class GetHandler extends RequestHandler {
     @Override
     public Callable<Boolean> ifMe() {
         return () -> {
-            Value value = dao.internalGet(id.getBytes());
+            Value value = dao.internalGet(id.getBytes(), part);
             values.add(value);
             return true;
         };
@@ -43,7 +43,7 @@ public class GetHandler extends RequestHandler {
     @Override
     public Callable<Boolean> ifNotMe(HttpClient client) {
         return () -> {
-            final Response response = client.get(KVDaoServiceImpl.ENTITY_PATH + "?id=" + id, KVDaoServiceImpl.PROXY_HEADER);
+            final Response response = client.get(KVDaoServiceImpl.ENTITY_PATH + "?id=" + id + "&part=" + part, KVDaoServiceImpl.PROXY_HEADER);
             values.add(new Value(response.getBody(), Long.valueOf(response.getHeader(TIMESTAMP)),
                     Value.State.valueOf(response.getHeader(STATE))));
             return true;

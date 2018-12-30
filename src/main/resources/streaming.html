@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Streaming</title>
+
+    <style>
+        #progress_bar {
+            display: none;
+            margin: 10px 0;
+            padding: 3px;
+            border: 1px solid #000;
+            font-size: 14px;
+            clear: both;
+            opacity: 0;
+            -moz-transition: opacity 1s linear;
+            -o-transition: opacity 1s linear;
+            -webkit-transition: opacity 1s linear;
+        }
+        #progress_bar.loading {
+            display: block;
+            opacity: 1.0;
+        }
+        #progress_bar .percent {
+            background-color: #99ccff;
+            height: auto;
+            width: 0;
+        }
+    </style>
+
+    <script>
+        let progress;
+        let stop;
+        const chunkSize = 1024 * 64;
+
+        function abort() {
+            stop = true;
+        }
+
+        function updateProgress(i, total) {
+            // evt is an ProgressEvent.
+            const percentLoaded = Math.round((i / total) * 100);
+            // Increase the progress bar length.
+            progress.style.width = progress.textContent = percentLoaded + '%';
+        }
+
+        function sendPart(i, file, chunkQuantity) {
+            updateProgress(i, chunkQuantity);
+            if(chunkQuantity === i){
+                progress.style.width = progress.textContent ='100%';
+                return;
+            }
+            if(stop){
+                document.getElementById("data").innerText = "STOPPED";
+                return;
+            }
+
+            const blob = file.slice(i*chunkSize, (i+1)*chunkSize);
+            const reader = new FileReader();
+            reader.onloadend = function (evt) {
+                if (evt.target.readyState === FileReader.DONE) {
+                    fetch("/v0/streaming?id=" + file.name + "&part=" + (i+1), {
+                        method: "PUT",
+                        body: evt.target.result
+                    }).then(function (response) {
+                        if(response.ok){
+                            //console.log("SUCCESS " + (i+1));
+                            sendPart(i + 1, file, chunkQuantity);
+                        } else {
+                            document.getElementById("data").innerText = "SERVER ERROR";
+                        }
+                    });
+                }
+            };
+            reader.readAsBinaryString(blob);
+        }
+
+        function sendFile() {
+            stop = false;
+
+            const form = document.forms["putFileFrom"];
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                const files = document.querySelector('[type=file]').files;
+                const file = files[0];
+                if(typeof file === 'undefined'){
+                    return;
+                }
+                const chunkQuantity = Math.ceil(file.size / chunkSize);
+
+                fetch("/v0/streaming?part=0", {
+                    method: "PUT",
+                    body: JSON.stringify({"fileName": file.name, "chunkQuantity": chunkQuantity})
+                }).then(function (response) {
+                    if (response.ok) {
+                        //console.log("SUCCESS 0");
+
+                        progress = document.querySelector('.percent');
+                        progress.style.width = progress.textContent = '0%';
+                        document.getElementById('progress_bar').className = 'loading';
+                        sendPart(0, file, chunkQuantity);
+                    } else {
+                        document.getElementById("data").innerText = "SERVER ERROR";
+                    }
+                })
+            });
+        }
+
+        function getPart(i, name, chunkQuantity, counter) {
+            counter++;
+            if(chunkQuantity === i){
+                return;
+            }
+
+            fetch("/v0/streaming?id=" + name + "&part=" + (i+1), {
+                method: "GET"
+            }).then(function (response) {
+                if(response.ok){
+                    //console.log("SUCCESS " + (i+1));
+                    response.text().then(data => {
+                        //console.log(data);
+                        document.getElementById("data").innerText += data;
+                        if(counter !== 0) {
+                            getPart(i + 1, name, chunkQuantity, counter);
+                        } else {
+                            const handler = function() {
+                                let windowRelativeBottom = document.documentElement.getBoundingClientRect().bottom;
+                                if (windowRelativeBottom <= document.documentElement.clientHeight + 100) {
+                                    window.removeEventListener('scroll', handler);
+                                    getPart(i + 1, name, chunkQuantity, -3);
+                                }
+                            };
+                            window.addEventListener('scroll', handler);
+                        }
+                    });
+                }
+            });
+        }
+
+        function getFile() {
+            const form = document.forms["getFileForm"];
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                const id = document.querySelector('[type=text]').value;
+                if(id === "" || id === null){
+                    return;
+                }
+
+                fetch("/v0/streaming?id=" + id + "&part=0", {
+                    method: "GET"
+                }).then(function (response) {
+                    if (response.ok) {
+                        //console.log("SUCCESS 0");
+                        const res = response.json().then(data => {
+                            //console.log(data);
+                            getPart(0, id, data.chunkQuantity, -10);
+                        });
+                        document.getElementById("data").innerText = "";
+
+                    } else {
+                        document.getElementById("data").innerText = "NOT FOUND";
+                    }
+                });
+            });
+        }
+
+    </script>
+</head>
+<body>
+
+<form name="putFileFrom" method="post" enctype="multipart/form-data">
+    <input type="file" name="file">
+    <input type="submit" value="Upload File" name="submit" onclick="sendFile();">
+</form>
+<div id="progress_bar">
+    <div class="percent">0%</div>
+    <button onclick="abort()">Stop</button>
+</div>
+
+<form name="getFileForm" method="get">
+    <input type="text" name="fileName">
+    <input type="submit" value="Get File" name="submit" onclick="getFile();">
+</form>
+
+<div id="data" contenteditable="true">
+
+</div>
+
+</body>
+</html>

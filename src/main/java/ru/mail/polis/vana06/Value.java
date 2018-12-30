@@ -38,7 +38,7 @@ public class Value implements Serializable {
     }
 }
 
-class CustomSerializer implements Serializer<Value>, Serializable {
+class ValueCustomSerializer implements Serializer<Value>, Serializable {
 
     @Override
     public void serialize(@NotNull DataOutput2 out, @NotNull Value value) throws IOException {

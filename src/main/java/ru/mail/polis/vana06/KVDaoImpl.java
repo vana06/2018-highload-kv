@@ -15,7 +15,7 @@ import java.util.NoSuchElementException;
 public class KVDaoImpl implements KVDao {
 
     private final DB db;
-    private final HTreeMap<byte[], Value> storage;
+    private final HTreeMap<Key, Value> storage;
 
     /**
      * Инициализирует хранилище
@@ -24,7 +24,8 @@ public class KVDaoImpl implements KVDao {
      */
     public KVDaoImpl(File data) {
         File dataBase = new File(data, "dataBase");
-        Serializer<Value> serializer = new CustomSerializer();
+        Serializer<Value> valueSerializer = new ValueCustomSerializer();
+        Serializer<Key> keySerializer = new KeyCustomSerializer();
         this.db = DBMaker
                 .fileDB(dataBase)
                 .fileMmapEnableIfSupported()
@@ -33,8 +34,8 @@ public class KVDaoImpl implements KVDao {
                 .closeOnJvmShutdown()
                 .make();
         this.storage = db.hashMap(data.getName())
-                .keySerializer(Serializer.BYTE_ARRAY)
-                .valueSerializer(serializer)
+                .keySerializer(keySerializer)
+                .valueSerializer(valueSerializer)
                 .createOrOpen();
     }
 
@@ -48,7 +49,7 @@ public class KVDaoImpl implements KVDao {
     @NotNull
     @Override
     public byte[] get(@NotNull byte[] key) throws NoSuchElementException, IllegalStateException {
-        Value value = internalGet(key);
+        Value value = internalGet(key, 0);
 
         if (value.getState() == Value.State.ABSENT || value.getState() == Value.State.REMOVED) {
             throw new NoSuchElementException();
@@ -56,9 +57,16 @@ public class KVDaoImpl implements KVDao {
         return value.getData();
     }
 
+    /**
+     * Расширенная версия метода get.
+     *
+     * @param key  ключ для поиска
+     * @param part номер части файла
+     * @return объект класса {@code Value}, помимо данных содержит ключевую информацию о хранимом объекте
+     */
     @NotNull
-    public Value internalGet(@NotNull byte[] key) {
-        Value value = storage.get(key);
+    public Value internalGet(@NotNull byte[] key, long part) {
+        Value value = storage.get(new Key(key, part));
         if (value == null) {
             return new Value(new byte[]{}, 0, Value.State.ABSENT);
         }
@@ -74,7 +82,11 @@ public class KVDaoImpl implements KVDao {
      */
     @Override
     public void upsert(@NotNull byte[] key, @NotNull byte[] value) {
-        storage.put(key, new Value(value, System.currentTimeMillis(), Value.State.PRESENT));
+        upsert(key, 0, value);
+    }
+
+    public void upsert(@NotNull byte[] id, long part, @NotNull byte[] value) {
+        storage.put(new Key(id, part), new Value(value, System.currentTimeMillis(), Value.State.PRESENT));
     }
 
     /**
@@ -84,7 +96,17 @@ public class KVDaoImpl implements KVDao {
      */
     @Override
     public void remove(@NotNull byte[] key) {
-        storage.put(key, new Value(new byte[]{}, System.currentTimeMillis(), Value.State.REMOVED));
+        remove(key, 0);
+    }
+
+    /**
+     * Удаляет из хранилища элемент с ключом {@code key} и частью номер {@code part}
+     *
+     * @param key  ключ для поиска
+     * @param part номер части файла
+     */
+    public void remove(@NotNull byte[] key, long part) {
+        storage.put(new Key(key, part), new Value(new byte[]{}, System.currentTimeMillis(), Value.State.REMOVED));
     }
 
     /**

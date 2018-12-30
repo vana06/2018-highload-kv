@@ -2,8 +2,11 @@ package ru.mail.polis.vana06;
 
 import one.nio.http.*;
 import one.nio.net.ConnectionString;
+import one.nio.serial.Json;
 import one.nio.server.AcceptorConfig;
 import org.jetbrains.annotations.NotNull;
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ru.mail.polis.KVDao;
@@ -13,7 +16,10 @@ import ru.mail.polis.vana06.handler.GetHandler;
 import ru.mail.polis.vana06.handler.PutHandler;
 import ru.mail.polis.vana06.handler.RequestHandler;
 
+import javax.xml.bind.DatatypeConverter;
 import java.io.*;
+import java.net.URL;
+import java.nio.file.Files;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
@@ -111,13 +117,26 @@ public class KVDaoServiceImpl extends HttpServer implements KVService {
     public void handler(Request request,
                         HttpSession session,
                         @Param("id=") String id,
+                        @Param("part=") String partStr,
                         @Param("replicas=") String replicas) throws IOException {
         log.info("Параметры запроса:\n" + request);
 
         if (id == null || id.isEmpty()) {
-            log.error("id = " + id + " не удовлетворяет требованиям");
+            log.error("id = \'" + id + "\' не удовлетворяет требованиям");
             session.sendError(Response.BAD_REQUEST, null);
             return;
+        }
+
+        long part;
+        if (partStr == null || partStr.isEmpty()) {
+            part = 0;
+        } else {
+            part = Long.parseLong(partStr);
+            if (part < 0) {
+                log.error("part = \'" + partStr + "\' не удовлетворяет требованиям");
+                session.sendError(Response.BAD_REQUEST, "Номер части должен быть больше либо равен 0");
+                return;
+            }
         }
 
         RF rf;
@@ -145,15 +164,24 @@ public class KVDaoServiceImpl extends HttpServer implements KVService {
         boolean proxied = request.getHeader(PROXY_HEADER) != null;
         log.info("Тип запроса - " + getMethodName(request.getMethod()) + "; proxied - " + proxied);
         try {
+
             switch (request.getMethod()) {
                 case Request.METHOD_GET:
-                    session.sendResponse(customHandler(new GetHandler("GET", dao, rf, id), nodes, proxied));
+                    session.sendResponse(customHandler(new GetHandler("GET", dao, rf, id, part), nodes, proxied));
                     return;
                 case Request.METHOD_PUT:
-                    session.sendResponse(customHandler(new PutHandler("PUT", dao, rf, id, request.getBody()), nodes, proxied));
+                    session.sendResponse(customHandler(new PutHandler("PUT", dao, rf, id, part, request.getBody()), nodes, proxied));
                     return;
                 case Request.METHOD_DELETE:
-                    session.sendResponse(customHandler(new DeleteHandler("DELETE", dao, rf, id), nodes, proxied));
+                    byte[] metadata = dao.internalGet(id.getBytes(), 0).getData();
+                    session.sendResponse(customHandler(new DeleteHandler("DELETE", dao, rf, id, 0L), nodes, proxied));
+
+                    JSONObject obj = new JSONObject(new String(metadata));
+                    long partQuantity = obj.getLong("chunkQuantity");
+                    for (long i = 0; i < partQuantity; i++) {
+                        customHandler(new DeleteHandler("DELETE", dao, rf, id, i), nodes, proxied);
+                    }
+
                     return;
                 default:
                     log.error(request.getMethod() + " неподдерживаемый код метод");
@@ -166,6 +194,73 @@ public class KVDaoServiceImpl extends HttpServer implements KVService {
             log.error("Внутренняя ошибка сервера", e);
             log.error("Параметры запроса:\n" + request);
             session.sendError(Response.INTERNAL_ERROR, null);
+        } catch (JSONException e) {
+            log.info("Объект с id=" + id + " хранится в виде 1 части");
+            log.error(e.getMessage(), e);
+        }
+    }
+
+    @Path("/v0/streaming")
+    public void streaming(Request request,
+                          HttpSession session,
+                          @Param("id=") String id,
+                          @Param("part=") String part,
+                          @Param("replicas=") String replicas) throws IOException, JSONException {
+        log.info("Параметры запроса на streaming:\n" + request);
+
+        switch (request.getMethod()) {
+            case Request.METHOD_GET:
+                //возвращаю страницу
+                if (id == null || id.isEmpty()) {
+                    URL fileUrl = getClass().getClassLoader().getResource("streaming.html");
+                    if (fileUrl != null) {
+                        byte[] fileContent = Files.readAllBytes(new File(fileUrl.getPath()).toPath());
+                        Response response = Response.ok(fileContent);
+                        response.addHeader("Content-Type: text/html");
+
+                        session.sendResponse(response);
+                    } else {
+                        session.sendError(Response.NOT_FOUND, null);
+                    }
+                } else {
+                    if (part.equals("0")) {
+                        handler(request, session, id, part, replicas);
+                    } else {
+                        handler(request, session, id, part, replicas);
+                    }
+                }
+                break;
+            case Request.METHOD_PUT:
+                log.debug("PUT");
+                if (part.equals("0")) {
+                    //начинаю преготовления к сохранению данных
+                    JSONObject json = new JSONObject(new String(request.getBody()));
+                    if (!json.has("fileName") || !json.has("chunkQuantity")) {
+                        session.sendError(Response.BAD_REQUEST, "Json должен сожержать поля fileName и chunkQuantity");
+                        return;
+                    }
+
+                    String fileName = json.getString("fileName");
+                    if (!json.has("type")) {
+                        if (fileName.endsWith("webm")) {
+                            json.put("type", "video");
+                        } else if (fileName.endsWith("mp3")) {
+                            json.put("type", "audio");
+                        } else {
+                            json.put("type", "text");
+                        }
+                        request.setBody(json.toString().getBytes());
+                    }
+                    handler(request, session, json.getString("fileName"), part, replicas);
+                } else {
+                    log.debug("PART = " + part);
+                    handler(request, session, id, part, replicas);
+                }
+
+                break;
+            default:
+                log.error(request.getMethod() + " неподдерживаемый код метод");
+                session.sendResponse(new Response(Response.METHOD_NOT_ALLOWED));
         }
     }
 

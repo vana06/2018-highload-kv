@@ -32,6 +32,10 @@ dependencies {
     //logback
     compile("ch.qos.logback:logback-classic:1.2.3")
     compile("ch.qos.logback:logback-core:1.2.3")
+
+    // Json
+    compile("org.json", "json", "20090211")
+
 }
 
 tasks {

@@ -24,6 +24,7 @@ public abstract class RequestHandler {
     @NotNull
     private final RF rf;
     final String id;
+    final Long part;
     final byte[] value;
 
     final String TIMESTAMP = "timestamp";
@@ -36,13 +37,15 @@ public abstract class RequestHandler {
      * @param dao        хранилище данных
      * @param rf         replica factor
      * @param id         ключ
+     * @param part       номер части
      * @param value      значение; может быть null и применяется только для обработки метода PUT
      */
-    RequestHandler(String methodName, @NotNull KVDao dao, @NotNull RF rf, String id, byte[] value) {
+    RequestHandler(String methodName, @NotNull KVDao dao, @NotNull RF rf, String id, Long part, byte[] value) {
         this.methodName = methodName;
         this.dao = (KVDaoImpl) dao;
         this.rf = rf;
         this.id = id;
+        this.part = part;
         this.value = value;
     }
 
