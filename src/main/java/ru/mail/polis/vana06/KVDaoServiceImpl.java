@@ -109,7 +109,9 @@ public class KVDaoServiceImpl extends HttpServer implements KVService {
      *
      * @param request  данные запросы
      * @param session  реализует методы для ответа
-     * @param id       - непустая последовательность символов, используется как ключ
+     * @param id       непустая последовательность символов, используется как ключ
+     * @param bytesStr указывает начальный номер байта требуемого файла
+     * @param sizeStr  указывает размер файла
      * @param replicas содержит количетство узлов, которые должны подтвердить операцию, чтобы она считалась выполненной успешно
      * @throws IOException пробрасывается методом {@code sendError}
      */
@@ -117,24 +119,43 @@ public class KVDaoServiceImpl extends HttpServer implements KVService {
     public void handler(Request request,
                         HttpSession session,
                         @Param("id=") String id,
-                        @Param("part=") String partStr,
+                        @Param("bytes=") String bytesStr,
+                        @Param("size=") String sizeStr,
                         @Param("replicas=") String replicas) throws IOException {
         log.info("Параметры запроса:\n" + request);
 
+        //TODO занести весь код проверок в отдельных класс обертку
         if (id == null || id.isEmpty()) {
-            log.error("id = \'" + id + "\' не удовлетворяет требованиям");
+            log.error("id = " + id + " не удовлетворяет требованиям");
             session.sendError(Response.BAD_REQUEST, null);
             return;
         }
 
-        long part;
-        if (partStr == null || partStr.isEmpty()) {
-            part = 0;
+        long bytes;
+        boolean partial = false;
+        if (bytesStr == null || bytesStr.isEmpty()) {
+            String range = request.getHeader("Range:");
+            if (range != null) {
+                partial = true;
+                bytes = Integer.parseInt(range.replace("bytes=", "").replace("-", "").trim());
+            } else {
+                bytes = 0;
+            }
         } else {
-            part = Long.parseLong(partStr);
-            if (part < 0) {
-                log.error("part = \'" + partStr + "\' не удовлетворяет требованиям");
-                session.sendError(Response.BAD_REQUEST, "Номер части должен быть больше либо равен 0");
+            bytes = Long.parseLong(bytesStr);
+            if (bytes < -1) {
+                log.error("bytes = " + bytesStr + " не удовлетворяет требованиям");
+                session.sendError(Response.BAD_REQUEST, "Номер части должен быть больше либо равен 0, либо равен -1");
+                return;
+            }
+        }
+
+        long size = 0;
+        if (sizeStr != null && !sizeStr.isEmpty()) {
+            size = Long.parseLong(sizeStr);
+            if (size <= 0) {
+                log.error("size = " + sizeStr + " не удовлетворяет требованиям");
+                session.sendError(Response.BAD_REQUEST, "Размер файла должен быть больше 0");
                 return;
             }
         }
@@ -167,10 +188,10 @@ public class KVDaoServiceImpl extends HttpServer implements KVService {
 
             switch (request.getMethod()) {
                 case Request.METHOD_GET:
-                    session.sendResponse(customHandler(new GetHandler("GET", dao, rf, id, part), nodes, proxied));
+                    session.sendResponse(customHandler(new GetHandler("GET", dao, rf, id, bytes, partial, size), nodes, proxied));
                     return;
                 case Request.METHOD_PUT:
-                    session.sendResponse(customHandler(new PutHandler("PUT", dao, rf, id, part, request.getBody()), nodes, proxied));
+                    session.sendResponse(customHandler(new PutHandler("PUT", dao, rf, id, bytes, request.getBody()), nodes, proxied));
                     return;
                 case Request.METHOD_DELETE:
                     byte[] metadata = dao.internalGet(id.getBytes(), 0).getData();
@@ -200,11 +221,22 @@ public class KVDaoServiceImpl extends HttpServer implements KVService {
         }
     }
 
+    /**
+     * @param request  данные запросы
+     * @param session  реализует методы для ответа
+     * @param id       непустая последовательность символов, используется как ключ
+     * @param bytes    указывает начальный номер байта требуемого файла
+     * @param size     указывает размер файла
+     * @param replicas содержит количетство узлов, которые должны подтвердить операцию, чтобы она считалась выполненной успешно
+     * @throws IOException пробрасывает метод {@code readAllBytes} в случае ошибки при чтении html страницы
+     * @throws JSONException ошибка при работе с json
+     */
     @Path("/v0/streaming")
     public void streaming(Request request,
                           HttpSession session,
                           @Param("id=") String id,
-                          @Param("part=") String part,
+                          @Param("bytes=") String bytes,
+                          @Param("size=") String size,
                           @Param("replicas=") String replicas) throws IOException, JSONException {
         log.info("Параметры запроса на streaming:\n" + request);
 
@@ -223,16 +255,12 @@ public class KVDaoServiceImpl extends HttpServer implements KVService {
                         session.sendError(Response.NOT_FOUND, null);
                     }
                 } else {
-                    if (part.equals("0")) {
-                        handler(request, session, id, part, replicas);
-                    } else {
-                        handler(request, session, id, part, replicas);
-                    }
+                    handler(request, session, id, bytes, size, replicas);
                 }
                 break;
             case Request.METHOD_PUT:
                 log.debug("PUT");
-                if (part.equals("0")) {
+                if (bytes.equals("-1")) {
                     //начинаю преготовления к сохранению данных
                     JSONObject json = new JSONObject(new String(request.getBody()));
                     if (!json.has("fileName") || !json.has("chunkQuantity")) {
@@ -244,17 +272,16 @@ public class KVDaoServiceImpl extends HttpServer implements KVService {
                     if (!json.has("type")) {
                         if (fileName.endsWith("webm")) {
                             json.put("type", "video");
-                        } else if (fileName.endsWith("mp3")) {
+                        } else if (fileName.endsWith("mp3")) { //TODO not realized
                             json.put("type", "audio");
                         } else {
                             json.put("type", "text");
                         }
                         request.setBody(json.toString().getBytes());
                     }
-                    handler(request, session, json.getString("fileName"), part, replicas);
+                    handler(request, session, json.getString("fileName"), bytes, size, replicas);
                 } else {
-                    log.debug("PART = " + part);
-                    handler(request, session, id, part, replicas);
+                    handler(request, session, id, bytes, size, replicas);
                 }
 
                 break;

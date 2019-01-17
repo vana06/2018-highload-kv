@@ -12,20 +12,20 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 
 public class PutHandler extends RequestHandler {
-    public PutHandler(@NotNull String methodName, @NotNull KVDao dao, @NotNull RF rf, String id, Long part, byte[] value) {
-        super(methodName, dao, rf, id, part, value);
+    public PutHandler(@NotNull String methodName, @NotNull KVDao dao, @NotNull RF rf, String id, Long bytes, byte[] value) {
+        super(methodName, dao, rf, id, bytes, value);
     }
 
     @Override
     public Response onProxied() {
-        dao.upsert(id.getBytes(), part, value);
+        dao.upsert(id.getBytes(), bytes, value);
         return new Response(Response.CREATED, Response.EMPTY);
     }
 
     @Override
     public Callable<Boolean> ifMe() {
         return () -> {
-            dao.upsert(id.getBytes(), part, value);
+            dao.upsert(id.getBytes(), bytes, value);
             return true;
         };
     }
@@ -33,7 +33,7 @@ public class PutHandler extends RequestHandler {
     @Override
     public Callable<Boolean> ifNotMe(HttpClient client) {
         return () -> {
-            final Response response = client.put(KVDaoServiceImpl.ENTITY_PATH + "?id=" + id + "&part=" + part, value, KVDaoServiceImpl.PROXY_HEADER);
+            final Response response = client.put(KVDaoServiceImpl.ENTITY_PATH + "?id=" + id + "&bytes=" + bytes, value, KVDaoServiceImpl.PROXY_HEADER);
             return response.getStatus() == 201;
         };
     }

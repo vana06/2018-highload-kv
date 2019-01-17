@@ -61,12 +61,12 @@ public class KVDaoImpl implements KVDao {
      * Расширенная версия метода get.
      *
      * @param key  ключ для поиска
-     * @param part номер части файла
+     * @param bytes начальный байт из файла, хранится в виде отдельного чанка
      * @return объект класса {@code Value}, помимо данных содержит ключевую информацию о хранимом объекте
      */
     @NotNull
-    public Value internalGet(@NotNull byte[] key, long part) {
-        Value value = storage.get(new Key(key, part));
+    public Value internalGet(@NotNull byte[] key, long bytes) {
+        Value value = storage.get(new Key(key, bytes));
         if (value == null) {
             return new Value(new byte[]{}, 0, Value.State.ABSENT);
         }
@@ -85,8 +85,8 @@ public class KVDaoImpl implements KVDao {
         upsert(key, 0, value);
     }
 
-    public void upsert(@NotNull byte[] id, long part, @NotNull byte[] value) {
-        storage.put(new Key(id, part), new Value(value, System.currentTimeMillis(), Value.State.PRESENT));
+    public void upsert(@NotNull byte[] id, long bytes, @NotNull byte[] value) {
+        storage.put(new Key(id, bytes), new Value(value, System.currentTimeMillis(), Value.State.PRESENT));
     }
 
     /**
@@ -100,13 +100,13 @@ public class KVDaoImpl implements KVDao {
     }
 
     /**
-     * Удаляет из хранилища элемент с ключом {@code key} и частью номер {@code part}
+     * Удаляет из хранилища элемент с ключом {@code key} и частью номер {@code bytes}
      *
      * @param key  ключ для поиска
-     * @param part номер части файла
+     * @param bytes начальный байт из файла, хранится в виде отдельного чанка
      */
-    public void remove(@NotNull byte[] key, long part) {
-        storage.put(new Key(key, part), new Value(new byte[]{}, System.currentTimeMillis(), Value.State.REMOVED));
+    public void remove(@NotNull byte[] key, long bytes) {
+        storage.put(new Key(key, bytes), new Value(new byte[]{}, System.currentTimeMillis(), Value.State.REMOVED));
     }
 
     /**

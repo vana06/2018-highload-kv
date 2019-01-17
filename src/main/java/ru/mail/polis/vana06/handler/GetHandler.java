@@ -17,14 +17,18 @@ import java.util.concurrent.Future;
 
 public class GetHandler extends RequestHandler {
     private List<Value> values = new ArrayList<>();
+    private boolean partial;
+    private long allSize;
 
-    public GetHandler(@NotNull String methodName, @NotNull KVDao dao, @NotNull RF rf, String id, Long part) {
-        super(methodName, dao, rf, id, part, null);
+    public GetHandler(@NotNull String methodName, @NotNull KVDao dao, @NotNull RF rf, String id, Long bytes, boolean partial, long allSize) {
+        super(methodName, dao, rf, id, bytes, null);
+        this.partial = partial;
+        this.allSize = allSize;
     }
 
     @Override
     public Response onProxied() throws NoSuchElementException {
-        Value value = dao.internalGet(id.getBytes(), part);
+        Value value = dao.internalGet(id.getBytes(), bytes);
         Response response = new Response(Response.OK, value.getData());
         response.addHeader(TIMESTAMP + value.getTimestamp());
         response.addHeader(STATE + value.getState().name());
@@ -34,7 +38,7 @@ public class GetHandler extends RequestHandler {
     @Override
     public Callable<Boolean> ifMe() {
         return () -> {
-            Value value = dao.internalGet(id.getBytes(), part);
+            Value value = dao.internalGet(id.getBytes(), bytes);
             values.add(value);
             return true;
         };
@@ -43,7 +47,7 @@ public class GetHandler extends RequestHandler {
     @Override
     public Callable<Boolean> ifNotMe(HttpClient client) {
         return () -> {
-            final Response response = client.get(KVDaoServiceImpl.ENTITY_PATH + "?id=" + id + "&part=" + part, KVDaoServiceImpl.PROXY_HEADER);
+            final Response response = client.get(KVDaoServiceImpl.ENTITY_PATH + "?id=" + id + "&bytes=" + bytes, KVDaoServiceImpl.PROXY_HEADER);
             values.add(new Value(response.getBody(), Long.valueOf(response.getHeader(TIMESTAMP)),
                     Value.State.valueOf(response.getHeader(STATE))));
             return true;
@@ -57,7 +61,15 @@ public class GetHandler extends RequestHandler {
                 .max(Comparator.comparing(Value::getTimestamp))
                 .get();
         if (max.getState() == Value.State.PRESENT) {
-            return success(Response.OK, acks, max.getData());
+            if (partial) {
+                Response response = success(Response.PARTIAL_CONTENT, acks, max.getData());
+                response.addHeader("Content-Type: multipart/byteranges");
+                response.addHeader("Accept-Ranges: bytes");
+                response.addHeader("Content-Range: bytes " + bytes + "-" + (bytes + max.getData().length - 1) + "/" + allSize);
+                return response;
+            } else {
+                return success(Response.OK/*Response.PARTIAL_CONTENT*/, acks, max.getData());
+            }
         } else {
             throw new NoSuchElementException();
         }

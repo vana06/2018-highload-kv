@@ -12,25 +12,25 @@ import java.util.Arrays;
 
 public class Key implements Serializable {
     private final ByteBuffer id;
-    private final long part;
+    private final long bytes;
 
-    Key(byte[] id, long part) {
+    Key(byte[] id, long bytes) {
         this.id = ByteBuffer.wrap(id);
-        this.part = part;
+        this.bytes = bytes;
     }
 
     public ByteBuffer getId() {
         return id;
     }
 
-    Long getPart() {
-        return part;
+    Long getBytes() {
+        return bytes;
     }
 
     @Override
     public int hashCode() {
         //todo better hash
-        return (int) (id.hashCode() + part);
+        return (int) (id.hashCode() + bytes);
     }
 
     @Override
@@ -38,7 +38,7 @@ public class Key implements Serializable {
         if (getClass() != obj.getClass())
             return false;
         Key key = (Key) obj;
-        return Arrays.equals(id.array(), key.id.array()) && part == key.part;
+        return Arrays.equals(id.array(), key.id.array()) && bytes == key.bytes;
     }
 }
 
@@ -48,7 +48,7 @@ class KeyCustomSerializer implements Serializer<Key>, Serializable {
     public void serialize(@NotNull DataOutput2 out, @NotNull Key key) throws IOException {
         out.writeInt(key.getId().array().length);
         out.write(key.getId().array());
-        out.writeLong(key.getPart());
+        out.writeLong(key.getBytes());
     }
 
     @Override
@@ -57,9 +57,9 @@ class KeyCustomSerializer implements Serializer<Key>, Serializable {
         byte[] id = new byte[length];
         input.readFully(id);
 
-        long part = input.readLong();
+        long bytes = input.readLong();
 
-        return new Key(id, part);
+        return new Key(id, bytes);
     }
 
 }

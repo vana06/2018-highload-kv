@@ -16,8 +16,8 @@ import java.util.concurrent.Future;
  */
 public class DeleteHandler extends RequestHandler {
 
-    public DeleteHandler(@NotNull String methodName, @NotNull KVDao dao, @NotNull RF rf, String id, Long part) {
-        super(methodName, dao, rf, id, part,null);
+    public DeleteHandler(@NotNull String methodName, @NotNull KVDao dao, @NotNull RF rf, String id, Long bytes) {
+        super(methodName, dao, rf, id, bytes,null);
     }
 
     @Override
@@ -29,7 +29,7 @@ public class DeleteHandler extends RequestHandler {
     @Override
     public Callable<Boolean> ifMe() {
         return () -> {
-            dao.remove(id.getBytes(), part);
+            dao.remove(id.getBytes(), bytes);
             return true;
         };
     }
@@ -37,7 +37,7 @@ public class DeleteHandler extends RequestHandler {
     @Override
     public Callable<Boolean> ifNotMe(HttpClient client) {
         return () -> {
-            final Response response = client.delete(KVDaoServiceImpl.ENTITY_PATH + "?id=" + id + "&part=" + part, KVDaoServiceImpl.PROXY_HEADER);
+            final Response response = client.delete(KVDaoServiceImpl.ENTITY_PATH + "?id=" + id + "&bytes=" + bytes, KVDaoServiceImpl.PROXY_HEADER);
             return response.getStatus() == 202;
         };
     }

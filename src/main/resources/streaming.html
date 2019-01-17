@@ -31,7 +31,7 @@
     <script>
         let progress;
         let stop;
-        const chunkSize = 1024 * 64;
+        const chunkSize = 1024 * 32;
 
         function abort() {
             stop = true;
@@ -55,11 +55,10 @@
                 return;
             }
 
-            const blob = file.slice(i*chunkSize, (i+1)*chunkSize);
             const reader = new FileReader();
             reader.onloadend = function (evt) {
                 if (evt.target.readyState === FileReader.DONE) {
-                    fetch("/v0/streaming?id=" + file.name + "&part=" + (i+1), {
+                    fetch("/v0/streaming?id=" + file.name + "&bytes=" + i*chunkSize, {
                         method: "PUT",
                         body: evt.target.result
                     }).then(function (response) {
@@ -72,7 +71,9 @@
                     });
                 }
             };
-            reader.readAsBinaryString(blob);
+
+            const blob = file.slice(i*chunkSize, (i+1)*chunkSize);
+            reader.readAsArrayBuffer(blob);
         }
 
         function sendFile() {
@@ -89,9 +90,10 @@
                 }
                 const chunkQuantity = Math.ceil(file.size / chunkSize);
 
-                fetch("/v0/streaming?part=0", {
+                console.log(file.size);
+                fetch("/v0/streaming?bytes=-1", {
                     method: "PUT",
-                    body: JSON.stringify({"fileName": file.name, "chunkQuantity": chunkQuantity})
+                    body: JSON.stringify({"fileName": file.name, "chunkQuantity": chunkQuantity, "fileSize": file.size})
                 }).then(function (response) {
                     if (response.ok) {
                         //console.log("SUCCESS 0");
@@ -107,13 +109,13 @@
             });
         }
 
-        function getPart(i, name, chunkQuantity, counter) {
+        function getTextPart(i, name, chunkQuantity, counter) {
             counter++;
             if(chunkQuantity === i){
                 return;
             }
 
-            fetch("/v0/streaming?id=" + name + "&part=" + (i+1), {
+            fetch("/v0/streaming?id=" + name + "&bytes=" + (i*chunkSize), {
                 method: "GET"
             }).then(function (response) {
                 if(response.ok){
@@ -122,13 +124,13 @@
                         //console.log(data);
                         document.getElementById("data").innerText += data;
                         if(counter !== 0) {
-                            getPart(i + 1, name, chunkQuantity, counter);
+                            getTextPart(i + 1, name, chunkQuantity, counter);
                         } else {
                             const handler = function() {
                                 let windowRelativeBottom = document.documentElement.getBoundingClientRect().bottom;
                                 if (windowRelativeBottom <= document.documentElement.clientHeight + 100) {
                                     window.removeEventListener('scroll', handler);
-                                    getPart(i + 1, name, chunkQuantity, -3);
+                                    getTextPart(i + 1, name, chunkQuantity, -3);
                                 }
                             };
                             window.addEventListener('scroll', handler);
@@ -148,21 +150,34 @@
                     return;
                 }
 
-                fetch("/v0/streaming?id=" + id + "&part=0", {
+                fetch("/v0/streaming?id=" + id + "&bytes=-1", {
                     method: "GET"
                 }).then(function (response) {
                     if (response.ok) {
                         //console.log("SUCCESS 0");
                         const res = response.json().then(data => {
-                            //console.log(data);
-                            getPart(0, id, data.chunkQuantity, -10);
-                        });
-                        document.getElementById("data").innerText = "";
+                            const videoPlayer = document.getElementById("videoPlayer");
+                            const dataElement = document.getElementById("data");
+                            dataElement.innerText = "";
 
+                            if(data.type === 'text') {
+                                videoPlayer.hidden = true;
+                                getTextPart(0, id, data.chunkQuantity, -10);
+                            } else if(data.type === 'video'){
+                                dataElement.innerText = "";
+                                videoPlayer.hidden = false;
+                                videoPlayer.pause();
+                                videoPlayer.src = "http://localhost:8080/v0/streaming?id=" + id + "&size=" + data.fileSize;
+                                videoPlayer.load();
+                            } else {
+                                document.getElementById("data").innerText = "NOT SUPPORTED TYPE";
+                            }
+                        });
                     } else {
                         document.getElementById("data").innerText = "NOT FOUND";
                     }
                 });
+
             });
         }
 
@@ -187,6 +202,10 @@
 <div id="data" contenteditable="true">
 
 </div>
+
+<video id="videoPlayer" width="640" height="480" controls hidden>
+    <source src="" type="video/webm">
+</video>
 
 </body>
 </html>
